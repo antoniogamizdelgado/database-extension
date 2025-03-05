@@ -1,1 +1,1 @@
-export { createFileCommand } from "./createFileCommand";
+export { openDatabaseTableCommand } from "./openDatabaseTableCommand";
