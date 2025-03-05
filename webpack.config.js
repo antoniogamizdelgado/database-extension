@@ -25,7 +25,11 @@ const extensionConfig = {
   },
   resolve: {
     // support reading TypeScript and JavaScript files, 📖 -> https://github.com/TypeStrong/ts-loader
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    fallback: {
+      // Add a fallback for pg-native which is an optional dependency
+      'pg-native': false
+    }
   },
   module: {
     rules: [

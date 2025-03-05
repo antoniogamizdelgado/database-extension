@@ -1,6 +1,8 @@
 import { WebviewPanel } from "vscode";
 import { ViewColumn, Uri, window } from "vscode";
 import { TableMetadata } from "../pg/table";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface TableData {
   columns: string[];
@@ -16,7 +18,11 @@ export class TableView {
     }
 
     this.panel = TableView.createWebviewPanel(tableName);
-    this.panel.webview.html = TableView.getHtmlContent(tableName, tableData);
+    this.panel.webview.html = TableView.getHtmlContent(
+      tableName,
+      tableData,
+      this.panel
+    );
     this.panel.reveal();
 
     // Handle messages from the webview
@@ -50,8 +56,21 @@ export class TableView {
 
   private static getHtmlContent(
     tableName: string,
-    tableData: TableData
+    tableData: TableData,
+    panel: WebviewPanel
   ): string {
+    // Get path to the HTML template
+    const extensionPath = path.resolve(__dirname, "../");
+    const htmlPath = path.join(
+      extensionPath,
+      "src",
+      "webview",
+      "tableView.html"
+    );
+
+    // Read the HTML template
+    let html = fs.readFileSync(htmlPath, "utf8");
+
     // Convert table data to JSON string for use in the HTML
     const columnsJson = JSON.stringify(
       tableData.columns.map((col) => ({
@@ -63,118 +82,19 @@ export class TableView {
 
     const rowsJson = JSON.stringify(tableData.rows);
 
-    return /*html*/ `
-    <!DOCTYPE html>
-    <html lang="en">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Tabular Data View</title>
-        
-        <!-- Tabulator CSS -->
-        <link href="https://unpkg.com/tabulator-tables@5.5.0/dist/css/tabulator.min.css" rel="stylesheet">
-        
-        <!-- Tabulator JS -->
-        <script type="text/javascript" src="https://unpkg.com/tabulator-tables@5.5.0/dist/js/tabulator.min.js"></script>
-        
-        <style>
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-            padding: 20px;
-            background-color: var(--vscode-editor-background);
-            color: var(--vscode-editor-foreground);
-          }
-          
-          h1 {
-            color: var(--vscode-editor-foreground);
-            margin-bottom: 20px;
-          }
-          
-          #table-container {
-            margin-top: 20px;
-            height: 400px;
-            width: 100%;
-          }
-          
-          /* Tabulator theme customization to match VS Code */
-          .tabulator {
-            background-color: var(--vscode-editor-background);
-            border: 1px solid var(--vscode-panel-border);
-          }
-          
-          .tabulator .tabulator-header {
-            background-color: var(--vscode-editor-background);
-            border-bottom: 1px solid var(--vscode-panel-border);
-            color: var(--vscode-editor-foreground);
-          }
-          
-          .tabulator .tabulator-header .tabulator-col {
-            background-color: var(--vscode-editor-background);
-            border-right: 1px solid var(--vscode-panel-border);
-          }
-          
-          .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row {
-            background-color: var(--vscode-editor-background);
-            border-bottom: 1px solid var(--vscode-panel-border);
-            color: var(--vscode-editor-foreground);
-          }
-          
-          .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-row-even {
-            background-color: var(--vscode-list-hoverBackground);
-          }
-          
-          .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row.tabulator-selected {
-            background-color: var(--vscode-list-activeSelectionBackground);
-            color: var(--vscode-list-activeSelectionForeground);
-          }
-          
-          .tabulator .tabulator-tableHolder .tabulator-table .tabulator-row:hover {
-            background-color: var(--vscode-list-hoverBackground);
-          }
-          
-          .metadata-panel {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: var(--vscode-editor-background);
-            border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
-          }
-          
-          .metadata-title {
-            font-weight: bold;
-            margin-bottom: 10px;
-          }
-          
-          .metadata-item {
-            margin-bottom: 5px;
-          }
-        </style>
-      </head>
-      <body>
-        <h1>Table: ${tableName}</h1>
-        <div id="table-container"></div>
-        
-        <script>
-          // Table data from the server
-          const tableColumns = ${columnsJson};
-          const tableData = ${rowsJson};
-          
-          // Initialize Tabulator when the document is ready
-          document.addEventListener("DOMContentLoaded", function() {
-            new Tabulator("#table-container", {
-              data: tableData,
-              columns: tableColumns,
-              layout: "fitColumns",
-              pagination: "local",
-              paginationSize: 10,
-              initialSort: tableColumns.length > 0 ? [{column: tableColumns[0].field, dir: "asc"}] : [],
-              placeholder: "No Data Available"
-            });
-          });
-        </script>
-      </body>
-    </html>
-  `;
+    // Get the URI for the webview script
+    const scriptPath = Uri.file(
+      path.join(extensionPath, "dist", "webview", "tableView.js")
+    );
+    const scriptUri = panel.webview.asWebviewUri(scriptPath);
+
+    // Replace placeholders in the HTML template
+    html = html.replace("{{tableName}}", tableName);
+    html = html.replace(/{\/\*COLUMNS_JSON_PLACEHOLDER\*\/}/g, columnsJson);
+    html = html.replace(/{\/\*ROWS_JSON_PLACEHOLDER\*\/}/g, rowsJson);
+    html = html.replace("{{webviewScriptUri}}", scriptUri.toString());
+
+    return html;
   }
 
   /**
@@ -184,12 +104,8 @@ export class TableView {
     metadata: TableMetadata,
     rows: any[]
   ): TableData {
-    const columns = metadata.columns.map((col) => col.name);
-    console.log("Converting metadata to table data");
-    console.log(columns);
-    console.log(rows);
     return {
-      columns,
+      columns: metadata.columns.map((col) => col.name),
       rows,
     };
   }
