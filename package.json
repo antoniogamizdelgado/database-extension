@@ -3,7 +3,7 @@
   "icon": "icon.png",
   "displayName": "Database Extension",
   "description": "Database Extension",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "antonio-gamiz-delgado",
   "repository": {
     "type": "git",
