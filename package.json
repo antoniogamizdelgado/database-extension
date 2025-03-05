@@ -1,5 +1,6 @@
 {
   "name": "database-extension",
+  "icon": "icon.png",
   "displayName": "Database Extension",
   "description": "Database Extension",
   "version": "0.0.1",
