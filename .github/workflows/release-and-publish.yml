@@ -127,3 +127,25 @@ jobs:
 
       - name: Publish to VS Code Marketplace
         run: npx vsce publish -p ${{ secrets.VSCE_PAT }}
+
+  cleanup:
+    if: failure()
+    needs: [check-version-and-tag, build, release, publish]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete tag if exists
+        if: needs.check-version-and-tag.outputs.version != ''
+        run: |
+          if git rev-parse "v${{ needs.check-version-and-tag.outputs.version }}" >/dev/null 2>&1; then
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+            git push --delete origin "v${{ needs.check-version-and-tag.outputs.version }}"
+            echo "Deleted tag v${{ needs.check-version-and-tag.outputs.version }} due to workflow failure"
+          fi
